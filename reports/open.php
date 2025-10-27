@@ -1,0 +1,4 @@
+<?php
+$querie = [
+	'sqlOpenRentals' => sqlOpenRentals(),
+];

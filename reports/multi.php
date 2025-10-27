@@ -1,0 +1,4 @@
+<?php
+$querie = [
+	'sqlMultiJoinRentals' => sqlMultiJoinRentals(),
+];

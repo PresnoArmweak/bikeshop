@@ -18,6 +18,16 @@ function sqlOpenRentals(): string {
 }
 
 
+function sqlCompletedRentals(): string {
+    return "SELECT r.rental_id, r.bike_id, r.customer_id, r.start_time, r.end_time, b.model, b.hourly_rate, c.first_name, c.last_name "
+         . "FROM rentals r "
+         . "JOIN bikes b ON r.bike_id = b.bike_id "
+         . "JOIN customers c ON r.customer_id = c.customer_id "
+         . "WHERE r.end_time IS NOT NULL "
+         . "ORDER BY r.rental_id";
+}
+
+
 function sqlJoinRentalsCustomers(): string {
 	return "SELECT * FROM rentals r "
          . "JOIN customers c ON r.customer_id = c.customer_id ";
@@ -54,31 +64,30 @@ function sqlUpdateBikeUnavailable(): string {
 
 // sets up the table of that will be displayed for each query in the HTML to be called in a foreach loop
 function renderTable(array $rows): string {
-	if (empty($rows)) {
-		return '<em>No rows returned.</em>';
-	}
-	$cols = array_keys($rows[0]);
-    print_r($cols);
-	$html = '<table border="1" cellpadding="6" cellspacing="0">';
-	$html .= '<thead><tr>';
-	foreach ($cols as $c) {
-        $arrayPossition = (array_search($c, array_keys($cols)));
-
-        if (fmod($arrayPossition, 2) === 0){
-            $html .= '<th>' . htmlspecialchars((string)$c) . '</th>';//why
+    if (empty($rows)) {
+        return '<em>No rows returned.</em>';
+    }
+    
+    // Get unique column names (skip numeric indices)
+    $cols = array_filter(array_keys($rows[0]), 'is_string');
+    
+    $html = '<table border="1" cellpadding="6" cellspacing="0">';
+    $html .= '<thead><tr>';
+    foreach ($cols as $c) {
+        $html .= '<th>' . htmlspecialchars((string)$c) . '</th>';
+    }
+    $html .= '</tr></thead><tbody>';
+    
+    foreach ($rows as $r) {
+        $html .= '<tr>';
+        foreach ($cols as $c) {
+            $val = $r[$c];
+            $html .= '<td>' . htmlspecialchars((string)$val) . '</td>';
         }
-	}
-	$html .= '</tr></thead><tbody>';
-	foreach ($rows as $r) {
-		$html .= '<tr>';
-		foreach ($cols as $c) {
-			$val = $r[$c];
-			$html .= '<td>' . htmlspecialchars((string)$val) . '</td>';
-		}
-		$html .= '</tr>';
-	}
-	$html .= '</tbody></table>';
-	return $html;
+        $html .= '</tr>';
+    }
+    $html .= '</tbody></table>';
+    return $html;
 }
 
 //Create a display-friendly name by stripping a leading 'sql' prefix.
@@ -99,16 +108,18 @@ function prettyName(string $name): string {
 }
 
 function make_A_Table($queries, $db){
+    // Allow reports to override the render function
+    global $renderTable;
+    $renderer = function_exists($renderTable) ? $renderTable : 'renderTable';
+    
     foreach ($queries as $name => $sql) {
-            $id = displayName($name); // not needed here for what we are doing but for anything else you are doing on a page 
+            $id = displayName($name);
             $label = prettyName($name);
-            echo '<h2 id="' . htmlspecialchars($id) . '">' . htmlspecialchars($label) . '</h2>'; // echo the title on the page
+            echo '<h2 id="' . htmlspecialchars($id) . '">' . htmlspecialchars($label) . '</h2>';
             try {
-                $stmt = $db->query($sql); 
-                print_r($stmt);
-                $rows = $stmt ? $stmt->fetchALL() : [];
-                print_r($rows);
-                echo renderTable($rows);
+                $stmt = $db->query($sql);
+                $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+                echo $renderer($rows);
             } catch (Throwable $e) {
                 echo '<p style="color:#b00;">Error: ' . htmlspecialchars($e->getMessage()) . '</p>';
             }
